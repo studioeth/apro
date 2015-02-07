@@ -1,38 +1,67 @@
 
+#include "toneAC.h"
+
 // STATE
 enum UserState {
-  stand,
-  sit
+  STAND,
+  SIT
 }userState;
 
 // HARDWARE PIN SETTING ///
-int SPEAKER = 7;
 int DIST_TRIG = 8;
-int DIST_ECHO = 9;
+int DIST_ECHO = 7;
 
-// PARAMS
-int distance; //[mm]
+// PARAMS ///
+int MAX_DISTANCE = 3000; //[mm]
+
+// sound
+int MIN_FREQ = 5;
+int MAX_FREQ = 35;
+int MAX_VOL = 100;
 
 void setup() {
-  userState = stand;
+  userState = STAND;
 
-//  Serial.begin(9600);
+  Serial.begin(9600);
   pinMode(DIST_TRIG,OUTPUT);
   pinMode(DIST_ECHO,INPUT);
 }
 
 void loop() {
-  distance = getDistance();
-  // TODO distance to vol and fq
-  int freq = 36;
-  int vol = 100;
-  int duration = 1000;
-  tone(SPEAKER, duration,freq);
+  
+  switch(userState){
+  case STAND:
+    distanceToTone(getDistance());
+    break; // end STAND
+    
+  case SIT:
+    break; // end SIT
+    
+  }
 }
 
-int getDistance(){
-  int duration;//[us]
-  int distance = 0;
+void distanceToTone(long distance){
+    Serial.print(distance);
+    Serial.print(" mm  ");
+    
+    if(distance < MAX_DISTANCE){
+      int freqRange = MAX_FREQ - MIN_FREQ;
+      int freq = MAX_FREQ - distance * freqRange / MAX_DISTANCE;
+      int vol = MAX_VOL - distance * MAX_VOL / MAX_DISTANCE;
+      int duration = 1000;
+      toneAC(freq, vol, duration);
+      
+      Serial.print(freq);
+      Serial.print(" freq ");
+      Serial.print(vol);
+      Serial.print(" vol");
+    }  
+    Serial.println("");
+}
+
+long getDistance(){
+  long duration;//[us]
+  long distance = 0;
   digitalWrite(DIST_TRIG,LOW);
   delayMicroseconds(1);
   digitalWrite(DIST_TRIG,HIGH);
@@ -40,11 +69,9 @@ int getDistance(){
   digitalWrite(DIST_TRIG,LOW);
   duration = pulseIn(DIST_ECHO,HIGH);
   if (duration>0) {
-    distance = duration*340*100/100000/2; // ultrasonic speed is 340m/s = 34000cm/s = 0.034cm/us 
-    Serial.print(duration);
-    Serial.print(" us ");
-    Serial.print(distance);
-    Serial.println(" mm");
+    distance = duration * 17 / 100; // ultrasonic speed is 340m/s = 340000mm/s = 0.34mm/us 
+    //Serial.print(duration);
+    //Serial.print(" us ");
   }
   return distance;
 }
