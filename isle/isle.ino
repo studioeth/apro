@@ -8,11 +8,15 @@ enum UserState {
 }userState;
 
 // HARDWARE PIN SETTING ///
+int PRESSURE = 0; // ANALOG
 int DIST_TRIG = 8;
 int DIST_ECHO = 7;
+// int SOUND1 = 9;[used by toneAC]
+// int SOUND2 = 10;[used by toneAC]
 
 // PARAMS ///
 int MAX_DISTANCE = 3000; //[mm]
+int PRESSURE_TH = 100;
 
 // sound
 int MIN_FREQ = 5;
@@ -29,6 +33,13 @@ void setup() {
 
 void loop() {
   
+  // check pressure
+  int press = analogRead(PRESSURE);
+  Serial.print(" Pressure: ");
+  Serial.println(press);
+
+  userState = press > PRESSURE_TH ? SIT:STAND; 
+  
   switch(userState){
   case STAND:
     distanceToTone(getDistance());
@@ -38,11 +49,13 @@ void loop() {
     break; // end SIT
     
   }
+  
+  delay( 50 ); // TODO
 }
 
 void distanceToTone(long distance){
     Serial.print(distance);
-    Serial.print(" mm  ");
+    Serial.print(" mm ");
     
     if(distance < MAX_DISTANCE){
       int freqRange = MAX_FREQ - MIN_FREQ;
