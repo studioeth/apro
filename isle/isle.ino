@@ -20,7 +20,7 @@ int DIST_ECHO = 7;
 
 // PARAMS ///
 int MAX_DISTANCE = 3000; //[mm]
-int PRESSURE_TH = 200;
+int PRESSURE_TH = 10;
 // sound
 int MIN_FREQ = 5;
 int MAX_FREQ = 35;
@@ -31,6 +31,8 @@ HMC5883L compass;
 int error = 0;
 double defaultAngle;
 double angle;
+double MIN_ANGLE = 1.0;
+double MAX_ANGLE = 7.0;
 
 const int PRESS_ARRAY_SIZE = 10;
 int lastPress[PRESS_ARRAY_SIZE];
@@ -113,9 +115,35 @@ double getAngle(){
 }
 
 void angleToTone(double angle){
-   Serial.print(" DegDiff  \t");
-   Serial.print(angle);
+  Serial.print(" DegDiff  \t");
+  Serial.print(angle);
+  
+  if(abs(angle) > MIN_ANGLE){
+    if( angle > MAX_ANGLE ){
+      angle = MAX_ANGLE;
+    }else if( angle < MAX_ANGLE * -1){
+      angle = MAX_ANGLE * -1;
+    }
+    
+    //TODO
+    if(angle < 0){
+      angle *= -1;
+    }
+    
+    double freqRange = MAX_FREQ - MIN_FREQ;
+    int freq = (angle - MIN_ANGLE) * freqRange / (MAX_ANGLE - MIN_ANGLE);
+    int vol = (angle - MIN_ANGLE) * MAX_VOL / (MAX_ANGLE - MIN_ANGLE);
+    int duration = 200;
+    toneAC(freq, vol, duration);
+    
+    Serial.print(" freq[Hz]: ");
+    Serial.print(freq);
+    Serial.print(" vol: ");
+    Serial.print(vol);
+    Serial.print(" angle: ");
+    Serial.print(angle);
 
+  }
 }
 
 int getPressure(){
