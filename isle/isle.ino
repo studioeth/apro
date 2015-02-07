@@ -20,7 +20,7 @@ int DIST_ECHO = 7;
 
 // PARAMS ///
 int MAX_DISTANCE = 3000; //[mm]
-int PRESSURE_TH = 10;
+int PRESSURE_TH = 200;
 // sound
 int MIN_FREQ = 5;
 int MAX_FREQ = 35;
