@@ -11,28 +11,33 @@ enum UserState {
 }userState;
 
 UserState lastUserState;
+
 // HARDWARE PIN SETTING ///
 int PRESSURE = 0; // ANALOG
 int DIST_TRIG = 8;
-int DIST_ECHO = 7;
+int DIST_ECHO1 = 5;
+int DIST_ECHO2 = 6;
+int DIST_ECHO3 = 7;
 // int SOUND1 = 9;[used by toneAC]
 // int SOUND2 = 10;[used by toneAC]
 
 // PARAMS ///
-int MAX_DISTANCE = 3000; //[mm]
-int PRESSURE_TH = 200;
+const int MAX_DISTANCE = 3000; //[mm]
+const int PRESSURE_TH = 200;
+const int TONE_DURATION = 200;
 // sound
-int MIN_FREQ = 5;
-int MAX_FREQ = 35;
-int MAX_VOL = 100;
+const int MIN_FREQ = 5;
+const int MAX_FREQ = 35;
+const int MAX_VOL = 100;
 
 // compass
 HMC5883L compass;
 int error = 0;
 double defaultAngle;
+int defaultPressure = 0;
 double angle;
-double MIN_ANGLE = 1.0;
-double MAX_ANGLE = 7.0;
+double MIN_ANGLE = 0.5;
+double MAX_ANGLE = 3.0;
 
 const int PRESS_ARRAY_SIZE = 10;
 int lastPress[PRESS_ARRAY_SIZE];
@@ -44,7 +49,9 @@ void setup() {
 
   Serial.begin(9600);
   pinMode(DIST_TRIG,OUTPUT);
-  pinMode(DIST_ECHO,INPUT);
+  pinMode(DIST_ECHO1,INPUT);
+  pinMode(DIST_ECHO2,INPUT);
+  pinMode(DIST_ECHO3,INPUT);
   
   //compass
   Serial.println("Starting the I2C interface.");
@@ -63,11 +70,13 @@ void setup() {
   if(error != 0) // If there is an error, print it out.
     Serial.println(compass.GetErrorText(error));
 
+  // Calc default pressure
+  //defaultPressure = getPressure();
 }
 
 void loop() {
   angle = getAngle();
-  userState = getPressure() > PRESSURE_TH ? SIT:STAND; 
+  userState = (getPressure() - defaultPressure) > PRESSURE_TH ? SIT:STAND; 
   
   if(lastUserState != userState){
     defaultAngle = angle;
@@ -83,7 +92,7 @@ void loop() {
     break; // end SIT
   }
   
-  delay( 50 ); // TODO
+  //delay( 50 ); // TODO
   lastUserState = userState;
     Serial.println("");
 }
@@ -133,8 +142,8 @@ void angleToTone(double angle){
     double freqRange = MAX_FREQ - MIN_FREQ;
     int freq = (angle - MIN_ANGLE) * freqRange / (MAX_ANGLE - MIN_ANGLE);
     int vol = (angle - MIN_ANGLE) * MAX_VOL / (MAX_ANGLE - MIN_ANGLE);
-    int duration = 200;
-    toneAC(freq, vol, duration);
+
+    toneAC(freq, vol, TONE_DURATION);
     
     Serial.print(" freq[Hz]: ");
     Serial.print(freq);
@@ -151,7 +160,7 @@ int getPressure(){
   
   for(int i = PRESS_ARRAY_SIZE - 1; i >= 0; i--){
     if(i == 0){
-      lastPress[i] = analogRead(PRESSURE); 
+      lastPress[i] = 1023 - analogRead(PRESSURE); 
     }else{
       lastPress[i] = lastPress[i-1];
     }
@@ -177,8 +186,8 @@ void distanceToTone(long distance){
       int freqRange = MAX_FREQ - MIN_FREQ;
       int freq = MAX_FREQ - distance * freqRange / MAX_DISTANCE;
       int vol = MAX_VOL - distance * MAX_VOL / MAX_DISTANCE;
-      int duration = 200;
-      toneAC(freq, vol, duration);
+      int duration = 100;
+      toneAC(freq, vol, TONE_DURATION);
       
       Serial.print(" freq[Hz]: ");
       Serial.print(freq);
@@ -188,18 +197,46 @@ void distanceToTone(long distance){
 }
 
 long getDistance(){
-  long duration;//[us]
   long distance = 0;
+  long duration = 0;
   digitalWrite(DIST_TRIG,LOW);
+
   delayMicroseconds(1);
   digitalWrite(DIST_TRIG,HIGH);
+  delayMicroseconds(10);
+  digitalWrite(DIST_TRIG,LOW);  
+  long duration1 = pulseIn(DIST_ECHO1,HIGH,20000);
+
   delayMicroseconds(1);
+  digitalWrite(DIST_TRIG,HIGH);
+  delayMicroseconds(10);
+  digitalWrite(DIST_TRIG,LOW);  
+  long duration2 = pulseIn(DIST_ECHO2,HIGH,20000);
+
+  delayMicroseconds(1);
+  digitalWrite(DIST_TRIG,HIGH);
+  delayMicroseconds(10);
   digitalWrite(DIST_TRIG,LOW);
-  duration = pulseIn(DIST_ECHO,HIGH);
+  long duration3 = pulseIn(DIST_ECHO3,HIGH,20000);
+  
+  Serial.print(" Durations[1-3]: ");
+  Serial.print(duration1);Serial.print(" us ");
+  Serial.print(duration2);Serial.print(" us ");
+  Serial.print(duration3);Serial.print(" us ");
+  
+  // use the smallest value as the duration.
+  duration = duration1;
+  if(duration > duration2 && duration2 > 0 ){
+    duration = duration2;
+  }
+  if(duration > duration3 && duration3 > 0 ){
+    duration = duration3;
+  }
+  
   if (duration > 0) {
     distance = duration * 17 / 100; // ultrasonic speed is 340m/s = 340000mm/s = 0.34mm/us 
-    //Serial.print(duration);
-    //Serial.print(" us ");
+  }else{
+    distance = MAX_DISTANCE;
   }
   return distance;
 }
