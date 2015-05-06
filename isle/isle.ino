@@ -14,15 +14,17 @@ UserState lastUserState;
 
 // HARDWARE PIN SETTING ///
 int PRESSURE = 0; // ANALOG
-int DIST_TRIG = 8;
+int DIST_TRIG1 = 8;
 int DIST_ECHO1 = 5;
+int DIST_TRIG2 = 2;
 int DIST_ECHO2 = 6;
+int DIST_TRIG3 = 3;
 int DIST_ECHO3 = 7;
 // int SOUND1 = 9;[used by toneAC]
 // int SOUND2 = 10;[used by toneAC]
 
 // PARAMS ///
-const int MAX_DISTANCE = 3000; //[mm]
+const int MAX_DISTANCE = 1000; //[mm]
 const int PRESSURE_TH = 200;
 const int TONE_DURATION = 200;
 // sound
@@ -36,19 +38,21 @@ int error = 0;
 double defaultAngle;
 int defaultPressure = 0;
 double angle;
-double MIN_ANGLE = 0.5;
-double MAX_ANGLE = 3.0;
+double MIN_ANGLE = 0.10;
+double MAX_ANGLE = 0.45;
 
 const int PRESS_ARRAY_SIZE = 10;
 int lastPress[PRESS_ARRAY_SIZE];
-const int DEGREE_ARRAY_SIZE = 10;
+const int DEGREE_ARRAY_SIZE = 5;
 double lastDegree[DEGREE_ARRAY_SIZE];
 
 void setup() {
   userState = UNKNOWN;
 
   Serial.begin(9600);
-  pinMode(DIST_TRIG,OUTPUT);
+  pinMode(DIST_TRIG1,OUTPUT);
+  pinMode(DIST_TRIG2,OUTPUT);
+  pinMode(DIST_TRIG3,OUTPUT);
   pinMode(DIST_ECHO1,INPUT);
   pinMode(DIST_ECHO2,INPUT);
   pinMode(DIST_ECHO3,INPUT);
@@ -71,7 +75,13 @@ void setup() {
     Serial.println(compass.GetErrorText(error));
 
   // Calc default pressure
-  //defaultPressure = getPressure();
+  for(int i = 0; i < PRESS_ARRAY_SIZE; i++){
+    defaultPressure = getPressure();
+  }
+  
+  Serial.print(" defaultPressure: ");
+    Serial.print(defaultPressure);
+
 }
 
 void loop() {
@@ -80,8 +90,20 @@ void loop() {
   
   if(lastUserState != userState){
     defaultAngle = angle;
+      // Calc default pressure
+      if(lastUserState == SIT){
+        for(int i = 0; i < PRESS_ARRAY_SIZE; i++){
+          defaultPressure = getPressure();
+        }
+      }else{
+        delay(5000);
+      }
   }
-  
+
+//    distanceToTone(getDistance());
+//  angleToTone(defaultAngle - angle);
+
+
   switch(userState){
   case STAND:
     distanceToTone(getDistance());
@@ -91,7 +113,7 @@ void loop() {
     angleToTone(defaultAngle - angle);
     break; // end SIT
   }
-  
+
   //delay( 50 ); // TODO
   lastUserState = userState;
     Serial.println("");
@@ -103,10 +125,10 @@ double getAngle(){
   // Retrived the scaled values from the compass (scaled to the configured scale).
   MagnetometerScaled scaled = compass.ReadScaledAxis();
   
-  float heading = atan2(scaled.YAxis, scaled.XAxis);
+  float heading = atan2(scaled.ZAxis, scaled.XAxis);
   double headingDegrees = heading * 180/M_PI; 
   double angle;
-   int aveRange = 10;   
+   int aveRange = DEGREE_ARRAY_SIZE;   
    double aveDeg = 0.0;
    for(int i = aveRange - 1; i >= 0; i-- ){
      if(i == 0){
@@ -143,8 +165,9 @@ void angleToTone(double angle){
     int freq = (angle - MIN_ANGLE) * freqRange / (MAX_ANGLE - MIN_ANGLE);
     int vol = (angle - MIN_ANGLE) * MAX_VOL / (MAX_ANGLE - MIN_ANGLE);
 
-    toneAC(freq, vol, TONE_DURATION);
-    
+    toneAC(freq, vol, TONE_DURATION,true);
+    delay(50);
+
     Serial.print(" freq[Hz]: ");
     Serial.print(freq);
     Serial.print(" vol: ");
@@ -172,7 +195,7 @@ int getPressure(){
   avePress /= PRESS_ARRAY_SIZE;
   
   Serial.print(" avePressure: ");
-  Serial.print(avePress);
+  Serial.print(avePress - defaultPressure);
   Serial.print("\t");
 
   return avePress;
@@ -182,13 +205,13 @@ void distanceToTone(long distance){
     Serial.print(" Dist[mm]: ");
     Serial.print(distance);
     
-    if(distance < MAX_DISTANCE){
+    if(distance <= MAX_DISTANCE){
       int freqRange = MAX_FREQ - MIN_FREQ;
       int freq = MAX_FREQ - distance * freqRange / MAX_DISTANCE;
       int vol = MAX_VOL - distance * MAX_VOL / MAX_DISTANCE;
       int duration = 100;
-      toneAC(freq, vol, TONE_DURATION);
-      
+      toneAC(freq, vol, TONE_DURATION, true);
+      delay(50);
       Serial.print(" freq[Hz]: ");
       Serial.print(freq);
       Serial.print(" vol: ");
@@ -199,26 +222,49 @@ void distanceToTone(long distance){
 long getDistance(){
   long distance = 0;
   long duration = 0;
-  digitalWrite(DIST_TRIG,LOW);
-
-  delayMicroseconds(1);
-  digitalWrite(DIST_TRIG,HIGH);
-  delayMicroseconds(10);
-  digitalWrite(DIST_TRIG,LOW);  
-  long duration1 = pulseIn(DIST_ECHO1,HIGH,20000);
-
-  delayMicroseconds(1);
-  digitalWrite(DIST_TRIG,HIGH);
-  delayMicroseconds(10);
-  digitalWrite(DIST_TRIG,LOW);  
-  long duration2 = pulseIn(DIST_ECHO2,HIGH,20000);
-
-  delayMicroseconds(1);
-  digitalWrite(DIST_TRIG,HIGH);
-  delayMicroseconds(10);
-  digitalWrite(DIST_TRIG,LOW);
-  long duration3 = pulseIn(DIST_ECHO3,HIGH,20000);
+  long duration1 = 0;
+  long duration2 = 0;
+  long duration3 = 0;
   
+  digitalWrite(DIST_TRIG1,LOW);
+  digitalWrite(DIST_TRIG2,LOW);
+  digitalWrite(DIST_TRIG3,LOW);
+
+  delayMicroseconds(20);
+  while(true){
+    if(digitalRead(DIST_ECHO1) == LOW)
+      break;
+  }
+  delayMicroseconds(20000);
+  
+  digitalWrite(DIST_TRIG1,HIGH);
+  delayMicroseconds(15);
+  digitalWrite(DIST_TRIG1,LOW);  
+  duration1 = pulseIn(DIST_ECHO1,HIGH,30000);
+//  delayMicroseconds(20000);
+
+  while(true){
+    if(digitalRead(DIST_ECHO2) == LOW)
+      break;
+  }
+//  delayMicroseconds(20000);
+
+  digitalWrite(DIST_TRIG2,HIGH);
+  delayMicroseconds(15);
+  digitalWrite(DIST_TRIG2,LOW);  
+  duration2 = pulseIn(DIST_ECHO2,HIGH,30000);
+
+  while(true){
+    if(digitalRead(DIST_ECHO3) == LOW)
+      break;
+  }
+ // delayMicroseconds(20000);
+
+  digitalWrite(DIST_TRIG3,HIGH);
+  delayMicroseconds(15);
+  digitalWrite(DIST_TRIG3,LOW);
+  duration3 = pulseIn(DIST_ECHO3,HIGH,30000);
+
   Serial.print(" Durations[1-3]: ");
   Serial.print(duration1);Serial.print(" us ");
   Serial.print(duration2);Serial.print(" us ");
